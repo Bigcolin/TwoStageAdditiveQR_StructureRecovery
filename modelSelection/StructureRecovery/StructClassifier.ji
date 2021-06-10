@@ -1,0 +1,50 @@
+using Base.Threads
+
+function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
+    n, Dim = size(model.trainData.X)
+    if tau == 0
+        nstep = 12
+        Tau = (1:nstep)  .* 4
+    else
+        nstep = 4
+        Tau = [0.9, 0.95, 1.05, 1.1] .*tau
+    end
+
+    Lambda = ones(nstep, Dim) .* Tau ./Dim
+    sae(l) = additiveQR.SAE(model, l, ∇)
+    
+    @threads for k in 1:nstep
+        Lambda[k, :] = Modified_CoorDescent.MCD_optim(model, sae, Lambda[k, :], ∇, n_mcd)
+    end
+
+    BIC_lambda = zeros(nstep)
+    Index = zeros(nstep, Dim)
+    Index = Bool.(Index)    
+    for k in 1:nstep
+        Index[k, :], BIC_lambda[k] = qBIC(Lambda[k, :], model, ∇)
+        if sum(Index[k, :]) == 0
+            BIC_lambda[k] = 1e7
+        end
+    end
+    lk = argmin(BIC_lambda)
+
+    ind = Index[lk, :]
+    lambda = Lambda[lk, :]
+    
+    max_l = maximum(lambda)
+    indm = lambda .> max_l/(Dim)
+    ind = ind .* indm
+    
+    X = model.trainData.X[:, ind]
+    newData = additiveQR.data(X, model.trainData.y)
+    ∇model = additiveQR.twoStageAddQR(elems, newData, q, true)
+    # filename = string("results_$∇", ".mat")
+    # matwrite(filename, Dict("lambda" => lambda, "index" => ind))
+    
+    res = Dict( 
+                "path" => Lambda,
+                "lambda" => lambda,
+                "index" => ind,
+                "model" => ∇model
+    )
+end

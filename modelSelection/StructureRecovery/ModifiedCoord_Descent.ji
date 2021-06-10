@@ -1,0 +1,67 @@
+# an optimize band width selection via SAE
+# λi = 1/hi, i = 1:d  
+# tau = sum(λ)
+
+module Modified_CoorDescent
+using LinearAlgebra
+using Base.Threads
+using Optim
+function MCD_optim(model, sae, tau::Float64, ∇, n_iter = 32)
+    n, d = size(model.trainData.X)
+    λ0 = ones(d) * tau / d
+    λ =  search(sae, λ0, n_iter)
+    λ   
+end
+
+function MCD_optim(model, sae, tau::Vector{Float64}, ∇, n_iter = 32)
+    # n, d = size(model.trainData.X)
+    λ0 = tau
+    λ =  search(sae, λ0, n_iter)
+    λ   
+end
+
+function search(SAE_tarfunc, λ0::Vector{Float64}, n_iter = 32,  tol = 0.5)
+    dim = length(λ0)    
+    τ = sum(λ0)
+
+    λ = copy(λ0)
+    funcval = SAE_tarfunc(λ)
+    Δ = funcval .* ones(5)
+    n = 0
+    tau = round(τ, digits = 2)
+    while (sum(Δ) > tol) & (n < n_iter)
+        for d in 1:dim
+            λd = zeros(dim) 
+            λd[d] = 1.0
+            lambda_d = copy(λ)
+            lambda_d[d] = 0
+            lambda_d = lambda_d./sum(lambda_d)
+            
+
+            tarfunc(γ) = SAE_tarfunc(γ * λd + (τ - γ) * lambda_d)
+            res = optimize(tarfunc, 0.0, τ, iterations = 200)
+
+            γ = res.minimizer
+            λ_γ = γ * λd + (τ - γ) * lambda_d
+            funcval_i = res.minimum
+
+            if funcval_i < funcval
+                pop!(Δ)
+                pushfirst!(Δ, abs(funcval_i - funcval)) # mean(Δ) < tol/10, iter stop
+                funcval = funcval_i
+                λ = λ_γ
+            end 
+            
+        end
+
+        n += 1
+    end
+    
+    λ
+
+end
+
+
+
+
+end

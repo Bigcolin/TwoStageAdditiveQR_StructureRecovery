@@ -1,0 +1,70 @@
+# using DataFrames
+using Random
+using CSV, DataFrames
+# u = 2^(-7/5)
+# f1(x) = abs(x) * sin(π*(1+u)/(x+u))
+##
+# f_model was removed because it's not important in the analysis of model results, 
+# the observe Y contain all the information we need 
+
+f1(x) = 2sin(2π*x)
+f2(x) = 2(3x - 1)^2
+f3(x) = 3x
+f4(x) = -4x
+f5(x) = 2x 
+f6(x) = 3sin(2π*x)/(2 - sin(2π*x))
+f7(x) = 5(0.1sin(2π*x) + 0.2cos(2π*x) + 0.3(sin(2π*x)^2) + 0.4cos(2π*x)^3 + 0.5sin(2π*x)^3) + 2x
+
+f7d(X) = f1.(X[:,1]) + f2.(X[:,2]) + f3.(X[:,3]) + 
+                f4.(X[:,4]) + f5.(X[:,5]) + f6.(X[:,6]) + 
+                f7.(X[:,7])
+f7d(x::Vector) = f1(x[1]) + f2(x[2]) + f3(x[3]) + 
+                    f4(x[4]) + f5(x[5]) + f6(x[6]) + 
+                    f7(x[7])
+
+f3d(X) = f1.(X[:,1]) + f2.(X[:,2]) + f3.(X[:,3])
+f3d(x::Vector) = f1(x[1]) + f2(x[2]) + f3(x[3])
+
+
+struct data
+    X::Array{Float64, 2}
+    y::Array{Float64, 1}
+
+    function data(N::Int, d::Int, d_zero::Int = 0, σ2 = 1.0 , η = 0.0 ) # η = 0 or 0.5
+        
+        # Random.seed!(2333)
+        dim = d + d_zero
+        x = rand(N, dim + 1)
+
+        # Random.seed!(2333)
+        eps = randn(N) * √σ2
+        
+        X = x[:, 1:dim] .+ η * x[:, dim + 1]
+        X = X ./ ( 1 + η)
+        X = (X .- 0.5) .* 2
+        
+        if d == 7
+            y = f1.(X[:,1]) + f2.(X[:,2]) + f3.(X[:,3]) + 
+                f4.(X[:,4]) + f5.(X[:,5]) + f6.(X[:,6]) + 
+                f7.(X[:,7]) + eps
+        end
+        
+        if d == 3
+            y = f1.(X[:,1]) + f2.(X[:,2]) + f3.(X[:,3]) + eps
+        end
+        
+        if d == 2
+            y = f1.(X[:,1]) + f2.(X[:,2]) + eps
+        end
+        y = y .- sum(y)./N
+
+        new(X, y)
+    end
+    
+    function data(X::Array{Float64, 2}, y::Array{Float64, 1})
+    
+        new(X, y)
+        
+    end
+
+end
