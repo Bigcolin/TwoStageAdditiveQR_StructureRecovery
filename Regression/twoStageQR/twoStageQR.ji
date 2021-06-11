@@ -3,10 +3,7 @@ include("dataGen.ji")
 using LinearAlgebra, Optim, Distributions
 import Base.Threads.@spawn, Base.Threads.@threads
 using BasicBSpline
-# Sep.20 #
-#    关于步长，刚开始写的时候用的width，一个标量，想法是先对样本的所有维度采用同样的步长
-#    现在觉得这种为了简便的lazy做法不可取，样本有多少维，对应于各个维度的步长就有多少个，即使一开始为了方便都设置成一个值，只设一个单标量肯定不方便后续修改的
-#    julia 有多重派发，单独留一个单标量width的版本即可
+
 function bisec_search(f, r, l, tol = 1e-4)
 # this search is based on f has a global optimizer
     delta = l - r
