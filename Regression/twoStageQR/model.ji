@@ -4,22 +4,19 @@ using MAT
 using Base.Threads
 using .additiveQR
 
-knots = [-4., -3., -2., 0., 2., 3., 4.]./2 # ./2 .+ 0.5
-pbs = 2
-nbs = 4  # n = 3, p = 2 is the best basis para. according to QBIC
-# elems = additiveQR.bsplElems(pbs, nbs)
-elems = additiveQR.bsplElems(knots, pbs)
 
+function model(nSamples, dSamples, d_zero)
+	Dim = dSamples + d_zero
+	knots = [-4., -3., -2., 0., 2., 3., 4.]./2 # ./2 .+ 0.5
+	pbs = 2
+	nbs = 4  # n = 3, p = 2 is the best basis para. according to QBIC
+	# elems = additiveQR.bsplElems(pbs, nbs)
+	elems = additiveQR.bsplElems(knots, pbs)
 
-nSamples = 200
-dSamples = 7
-d_zero = 13
-Dim = dSamples + d_zero
+	var = 1
+	eta = 0.
+	q = 0.5
 
-var = 1
-eta = 0.
-q = 0.5
-
-trainData = additiveQR.data(nSamples, dSamples, d_zero, var, eta)
-model = additiveQR.twoStageAddQR(elems, trainData, q, true)
-        
+	trainData = additiveQR.data(nSamples, dSamples, d_zero, var, eta)
+	model = additiveQR.twoStageAddQR(elems, trainData, q, true)
+end

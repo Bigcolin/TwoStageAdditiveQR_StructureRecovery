@@ -1,5 +1,5 @@
 module additiveQR
-include("dataGen.ji")
+include("DGP.ji")
 using LinearAlgebra, Optim, Distributions
 import Base.Threads.@spawn, Base.Threads.@threads
 using BasicBSpline

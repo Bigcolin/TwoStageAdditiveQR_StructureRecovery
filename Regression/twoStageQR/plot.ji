@@ -1,0 +1,35 @@
+
+# include("dataGen.ji")
+using Plots
+
+function predict_plot(l0, model)
+    ntest, dim = size(model.trainData.X)
+
+    zeroData = zeros(ntest, dim)
+    randData = rand(ntest, dim)
+    yt = zeros(ntest, dim)
+    # yp1 = zeros(ntest, dim)
+    yp3 = zeros(ntest, dim)
+    x1 = LinRange(-1, 1, ntest)
+
+    function predict_(k::Int)
+        testData = copy(zeroData)
+        testData[:, k] = x1
+        # ytk = f3d(testData) #.- ym
+        # yt[:, k] = ytk
+        yt[:, k] = model.trainData.y
+
+        yp3k = additiveQR.predictor(model, testData, l0)
+        yp3[:, k] = yp3k
+    end
+    
+    @threads for k in 1:dim
+        predict_(k)
+    end
+    p = plot(layout = (1,4))    
+    scatter!(p, x1, yt, layout = dim, label = false)
+    # plot!(p, x1, yp1, layout = dim)
+    plot!(p, x1, yp3, layout = dim, label = false)
+    p
+
+end
