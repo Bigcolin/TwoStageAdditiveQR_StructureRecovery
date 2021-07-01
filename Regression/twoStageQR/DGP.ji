@@ -1,5 +1,5 @@
 # using DataFrames
-using Random
+using Random, Distributions
 using CSV, DataFrames
 # u = 2^(-7/5)
 # f1(x) = abs(x) * sin(π*(1+u)/(x+u))
@@ -30,15 +30,18 @@ struct data
     X::Array{Float64, 2}
     y::Array{Float64, 1}
 
-    function data(N::Int, d::Int, d_zero::Int = 0, σ2 = 1.0 , η = 0.0 ) # η = 0 or 0.5
+    function data(N::Int, d::Int, d_zero::Int = 0, σ2 = 1.0 , η = 0.0, err_type = "g") # η = 0 or 0.5 , g for gauss, c for Cauchy
         
         # Random.seed!(2333)
         dim = d + d_zero
         x = rand(N, dim + 1)
 
         # Random.seed!(2333)
-        eps = randn(N) * √σ2
-        
+        if err_type == "g"
+            eps = randn(N) * √σ2
+        else
+            eps = rand(Cauchy(), N)
+        end
         X = x[:, 1:dim] .+ η * x[:, dim + 1]
         X = X ./ ( 1 + η)
         X = (X .- 0.5) .* 2

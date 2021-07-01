@@ -23,10 +23,10 @@ function predict_plot(l0, model)
         yp3[:, k] = yp3k
     end
     
-    @threads for k in 1:dim
+    for k in 1:dim
         predict_(k)
     end
-    p = plot(layout = (1,4))    
+    p = plot(layout = (1,dim))    
     scatter!(p, x1, yt, layout = dim, label = false)
     # plot!(p, x1, yp1, layout = dim)
     plot!(p, x1, yp3, layout = dim, label = false)

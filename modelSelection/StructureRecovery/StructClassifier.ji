@@ -1,5 +1,6 @@
 using Base.Threads
-
+include("ModifiedCoord_Descent.ji")
+include("analysis.ji")
 function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
     n, Dim = size(model.trainData.X)
     if tau == 0
@@ -32,12 +33,9 @@ function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
     lambda = Lambda[lk, :]
     
     max_l = maximum(lambda)
-    indm = lambda .> max_l/(Dim)
+    indm = lambda .> max_l/(10)
     ind = ind .* indm
     
-    X = model.trainData.X[:, ind]
-    newData = additiveQR.data(X, model.trainData.y)
-    ∇model = additiveQR.twoStageAddQR(elems, newData, q, true)
     # filename = string("results_$∇", ".mat")
     # matwrite(filename, Dict("lambda" => lambda, "index" => ind))
     
@@ -45,6 +43,5 @@ function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
                 "path" => Lambda,
                 "lambda" => lambda,
                 "index" => ind,
-                "model" => ∇model
     )
 end
