@@ -45,9 +45,9 @@ function search(SAE_tarfunc, λ0::Vector{Float64}, n_iter = 32,  tol = 0.5)
             λ_γ = γ * λd + (τ - γ) * lambda_d
             funcval_i = res.minimum
 
-            if funcval_i < funcval
+            if funcval_i < sum(Δ)./5
                 pop!(Δ)
-                pushfirst!(Δ, abs(funcval_i - funcval)) # mean(Δ) < tol/10, iter stop
+                pushfirst!(Δ, funcval_i) # mean(Δ) < tol/10, iter stop
                 funcval = funcval_i
                 λ = λ_γ
             end 

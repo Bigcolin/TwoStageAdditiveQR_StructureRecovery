@@ -3,12 +3,15 @@ include("../modelSelection/StructureRecovery/StructClassifier.ji")
 var = 1
 eta = 0.
 q = 0.5
-nSamples = 50
+nSamples = 100
 dSamples = 3
 d_zeros = 1 
 err_type = "c"
-trainData = additiveQR.data(nSamples, dSamples, d_zeros, var, eta, err_type)
-model1 = model(trainData, 0.5, "c")
-res1 = strucRec(model1, 1, 20.0, 16)
+# for k in 1:10
+	trainData = additiveQR.data(nSamples, dSamples, d_zeros, var, eta, err_type)
+	model1 = model(trainData, 0.5, err_type)
+	res1 = strucRec(model1, 1, 15.0, 64)
+	println(res1)
+# end
 
-sae(l) = additiveQR.SAE(model1, l, 1)
+# sae(l) = additiveQR.SAE(model1, l, 1)
