@@ -5,13 +5,9 @@ using Base.Threads
 using .additiveQR
 
 
-function model(trainData, q= 0.5, err_type = "g")
+function model(trainData, q= 0.5, pbs = 3, nbs = 4, err_type = "g")
 	knots = [-4., -3., -2., 0., 2., 3., 4.]./2 # ./2 .+ 0.5
-	pbs = 2
-	nbs = 4  # n = 3, p = 2 is the best basis para. according to QBIC
-	# elems = additiveQR.bsplElems(pbs, nbs)
-	elems = additiveQR.bsplElems(knots, pbs)
-
-
+	elems = additiveQR.bsplElems(pbs, nbs)
+	# elems = additiveQR.bsplElems(knots, pbs)
 	model = additiveQR.twoStageAddQR(elems, trainData, q, true)
 end

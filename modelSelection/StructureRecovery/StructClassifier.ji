@@ -8,7 +8,7 @@ function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
         Tau = (1:nstep)  .* 4
     else
         nstep = 4
-        Tau = [0.9, 0.95, 1.05, 1.1] .*tau
+        Tau = [0.6, 0.8, 1.0, 1.2] .*tau
     end
 
     Lambda = ones(nstep, Dim) .* Tau ./Dim
@@ -33,7 +33,7 @@ function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
     lambda = Lambda[lk, :]
     
     max_l = maximum(lambda)
-    indm = lambda .> max_l/(10)
+    indm = lambda .> max_l/(20) * ∇ 
     ind = ind .* indm
     
     # filename = string("results_$∇", ".mat")

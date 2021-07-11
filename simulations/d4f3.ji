@@ -4,14 +4,18 @@ var = 1
 eta = 0.
 q = 0.5
 nSamples = 100
-dSamples = 3
-d_zeros = 1 
-err_type = "c"
-for k in 1:5
+dSamples = 2
+d_zeros = 0 
+err_type = "g"
+f = open("record.txt", "w")
+close(f)
+@threads for k in 1:10
 	trainData = additiveQR.data(nSamples, dSamples, d_zeros, var, eta, err_type)
 	model1 = model(trainData, 0.5, err_type)
-	res1 = strucRec(model1, 1, 15.0, 128)
-	println(res1)
+	res1 = strucRec(model1, 3, 6.0, 200)
+    f = open("record.txt", "a")
+	println(f, res1, "\n")
+    close(f)
 end
 
 # sae(l) = additiveQR.SAE(model1, l, 1)
