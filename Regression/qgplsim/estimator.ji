@@ -1,4 +1,13 @@
-using Optim, LinearAlgebra, Distributions
+module qglsim
+using Optim, LinearAlgebra, Distributions, Random, Statistics
+
+function Base.:-(X::Matrix, xi::Vector)
+    n, p = size(X)
+    for i in 1:n
+        X[i, :] = X[i, :] - xi
+    end
+    X
+end
 
 function collection(c::Array{Int, 2})
     n, p = size(c)
@@ -15,7 +24,7 @@ function collection(c::Array{Int, 2})
     categ_c, dict_c
 end
 
-distributon_ker = Normal(0, 1)
+distribution_ker = Normal(0, 1)
 
 function ker(x)
     pdf(distribution_ker, x)
@@ -39,44 +48,62 @@ function ker(x::Matrix, xi::Vector, h::Vector)
     v
 end
 
-ρ(x, α = alpha) = abs(x) + (2α - 1)x
+ρ(x, α = 0.5) = abs(x) + (2α - 1)x
 
-function optimfunc(f, init_value, tols = 1e-4)
+function optimfunc(f, init_value, tols = 1e-5)
     res = optimize(f, init_value, method=BFGS(), f_tol=tols)
     return res 
 end
 
-module qglsim
 
-	function alphatheta_estimator(X, Z, y)
+function alphatheta_estimator(X, Z, y)
+	n, p = size(X)
+	α, θ = zeros(p), zeros(p)
+	h = ones(p) .* 0.3
+	categ, index = collection(Z)
 
-		n, p = size(X)
-		h = ones(p) .* 0.1
-		categ, index = collection(Z)
+	for z in categ
+		nz = length(index[z])
+		az = zeros(nz)
+		bz = zeros(nz, p)
+		w0 = zeros(p + 1)
+		yz = y[index[z]]
+		Xz = X[index[z], :]
+		for i in 1:nz
 
-		for z in categ
-			nz = length(index[z])
-			for i in index[z]
-				ai = 0
-				bi = zeros(p)
-				tarfunc = sum(ρ.(y .- ai .- bi * (X .- X[i, :]) .* ker.((X .- x[i, :]), h)))
-				
-			end
-		
+			tarfunc(w) = sum(ρ.(yz .- w[1] .- sum((Xz - Xz[i, :]) * w[2:end])) .* ker(Xz,  Xz[i, :], h))
+			res = optimfunc(tarfunc, w0)
+			wi = res.minimizer
+			az[i] = wi[1]
+			bz[i,:] = wi[2:end]
+
 		end
 
+		αz = zeros(p)
+		sum_bz = zeros(p)
+		for i in 1:nz - 1
+			for j in i + 1:nz
+				sum_bz += bz[i, :] - bz[j, :]
+			end
+		end
+		norm_bz = norm(sum_bz)
+		αz = sum_bz/norm_bz
+		α += αz * nz / n
 	end
+	α, θ
 
-	
-	function estimator_theta()
-	
-	end
+end
 
-	function estimator_beta()
-	
-	end
 
-	function estimator_gamma()
-	
-	end
+function estimator_theta()
+
+end
+
+function estimator_beta()
+
+end
+
+function estimator_gamma()
+
+end
 end

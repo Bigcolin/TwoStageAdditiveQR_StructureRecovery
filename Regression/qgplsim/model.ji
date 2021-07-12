@@ -1,7 +1,7 @@
 include("DGP.ji")
 include("estimator.ji")
 
-nSample = 200
+nSample = 400
 
 γ = [1, 1]
 θ = [1, 2]
@@ -10,3 +10,4 @@ nSample = 200
 X, Z, y = dgp(nSample, γ, θ, α, β)
 
 
+alpha, theta = qglsim.alphatheta_estimator(X, Z, y)
