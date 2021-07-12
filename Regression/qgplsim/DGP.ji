@@ -14,5 +14,5 @@ function dgp(nSample, γ, θ, α, β)
     Z = discret_var(nSample)
     y1 = X*α + Z*β + (X*θ + Z*γ .- 1).^2 + 0.2ϵ
     y2 = X*α + Z*β + log.(1 .+ exp.(X*θ + Z*γ .- 1)) + 0.2ϵ
-    X, Z, y1 
+    X, Z, y1
 end

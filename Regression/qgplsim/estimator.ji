@@ -59,27 +59,35 @@ end
 function alphatheta_estimator(X, Z, y)
 	n, p = size(X)
 	α, θ = zeros(p), zeros(p)
-	h = ones(p) .* 0.3
+	h = ones(p) .* n^(-0.4)
 	categ, index = collection(Z)
+	ncateg = index.count
 
-	for z in categ
+	αz = zeros(ncateg, p)
+	θz = zeros(ncateg, p)
+	for k in 1:ncateg
+		z = categ[k]
 		nz = length(index[z])
 		az = zeros(nz)
 		bz = zeros(nz, p)
-		w0 = zeros(p + 1)
+		cz = zeros(nz)
 		yz = y[index[z]]
 		Xz = X[index[z], :]
+		KerVal = zeros(nz, nz)
+		for i in 1:nz
+			KerVal[:, i] = ker(Xz, Xz[i, :], h)
+		end
+
 		for i in 1:nz
 
-			tarfunc(w) = sum(ρ.(yz .- w[1] .- sum((Xz - Xz[i, :]) * w[2:end])) .* ker(Xz,  Xz[i, :], h))
-			res = optimfunc(tarfunc, w0)
+			tar_alpha(w) = sum(ρ.(yz .- w[1] .- (Xz - Xz[i, :]) * w[2:end]) .* KerVal[:, i])
+			res = optimfunc(tar_alpha, zeros(p + 1))
 			wi = res.minimizer
 			az[i] = wi[1]
 			bz[i,:] = wi[2:end]
 
 		end
 
-		αz = zeros(p)
 		sum_bz = zeros(p)
 		for i in 1:nz - 1
 			for j in i + 1:nz
@@ -87,23 +95,27 @@ function alphatheta_estimator(X, Z, y)
 			end
 		end
 		norm_bz = norm(sum_bz)
-		αz = sum_bz/norm_bz
-		α += αz * nz / n
+		αz[k,:] = sum_bz/norm_bz
+
+		theta_z = zeros(nz, p)
+		for i in 1:nz
+			tar_theta(w) = sum(ρ.(yz .- az[i] - (Xz - Xz[i, :])*(w[2:end] +  w[1] * αz[k, :])) .* KerVal[:, i])
+			res = optimfunc(tar_theta, zeros(p + 1))
+			wi = res.minimizer
+			cz[i] = wi[1]
+			theta_z[i,:] = wi[2:end]
+		end
+		θz[k, :] = sum(theta_z, dims = 1)/nz
+
+		α += αz[k, :] * nz / n
+		θ += θz[k, :] * nz / n
 	end
-	α, θ
+	α, θ, αz, θz
 
 end
 
-
-function estimator_theta()
-
-end
-
-function estimator_beta()
+function betagamma_estimator()
 
 end
 
-function estimator_gamma()
-
-end
 end
