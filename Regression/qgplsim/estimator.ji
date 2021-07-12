@@ -1,10 +1,18 @@
 module qglsim
 using Optim, LinearAlgebra, Distributions, Random, Statistics
-
+import Base.Threads.@threads
 function Base.:-(X::Matrix, xi::Vector)
     n, p = size(X)
     for i in 1:n
         X[i, :] = X[i, :] - xi
+    end
+    X
+end
+
+function Base.:+(X::Matrix, xi::Vector)
+    n, p = size(X)
+    for i in 1:n
+        X[i, :] = X[i, :] + xi
     end
     X
 end
@@ -59,7 +67,6 @@ end
 function alphatheta_estimator(X, Z, y)
 	n, p = size(X)
 	α, θ = zeros(p), zeros(p)
-	h = ones(p) .* n^(-0.4)
 	categ, index = collection(Z)
 	ncateg = index.count
 
@@ -74,13 +81,14 @@ function alphatheta_estimator(X, Z, y)
 		yz = y[index[z]]
 		Xz = X[index[z], :]
 		KerVal = zeros(nz, nz)
+		h = ones(p) .* nz^(-0.4)
 		for i in 1:nz
 			KerVal[:, i] = ker(Xz, Xz[i, :], h)
 		end
 
 		for i in 1:nz
 
-			tar_alpha(w) = sum(ρ.(yz .- w[1] .- (Xz - Xz[i, :]) * w[2:end]) .* KerVal[:, i])
+			tar_alpha(w) = sum(ρ.(yz .- w[1] - (Xz - Xz[i, :]) * w[2:end]) .* KerVal[:, i])
 			res = optimfunc(tar_alpha, zeros(p + 1))
 			wi = res.minimizer
 			az[i] = wi[1]
@@ -88,25 +96,27 @@ function alphatheta_estimator(X, Z, y)
 
 		end
 
-		sum_bz = zeros(p)
-		for i in 1:nz - 1
-			for j in i + 1:nz
-				sum_bz += bz[i, :] - bz[j, :]
-			end
-		end
-		norm_bz = norm(sum_bz)
-		αz[k,:] = sum_bz/norm_bz
+		# sum_bz = zeros(p)
+		# for i in 1:nz - 1
+		# 	for j in i + 1:nz
+		# 		sum_bz += (bz[i, :] - bz[j, :])/norm(bz[i, :] - bz[j, :])
+		# 	end
+		# end
+		# αz[k,:] = sum_bz / (nz - 1)
 
 		theta_z = zeros(nz, p)
+		alpha_z = zeros(nz, p)
 		for i in 1:nz
-			tar_theta(w) = sum(ρ.(yz .- az[i] - (Xz - Xz[i, :])*(w[2:end] +  w[1] * αz[k, :])) .* KerVal[:, i])
+			Bzi = bz - bz[i, :]
+			tar_theta(w) = sum(ρ.(yz .- az[i] - sum((Xz - Xz[i, :]).*(w[1] .* Bzi + w[2:end]), dims = 2)) .* KerVal[:, i])
 			res = optimfunc(tar_theta, zeros(p + 1))
 			wi = res.minimizer
 			cz[i] = wi[1]
 			theta_z[i,:] = wi[2:end]
+			alpha_z[i,:] = sum(cz .* Bzi, dims = 1)
 		end
 		θz[k, :] = sum(theta_z, dims = 1)/nz
-
+		αz[k, :] = sum(alpha_z, dims = 1)/nz
 		α += αz[k, :] * nz / n
 		θ += θz[k, :] * nz / n
 	end
