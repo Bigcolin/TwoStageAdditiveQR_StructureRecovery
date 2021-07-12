@@ -1,0 +1,82 @@
+using Optim, LinearAlgebra, Distributions
+
+function collection(c::Array{Int, 2})
+    n, p = size(c)
+    categ_c = []
+    dict_c = Dict()
+    for i in 1:n
+        if c[i, :] in categ_c
+            push!(dict_c[c[i, :]], i)
+        else
+            push!(categ_c, c[i, :])
+            dict_c[c[i, :]] = [i]
+        end
+    end
+    categ_c, dict_c
+end
+
+distributon_ker = Normal(0, 1)
+
+function ker(x)
+    pdf(distribution_ker, x)
+end
+
+function ker(x::Vector, h::Vector)
+    d = length(x)
+    v = 1
+    for i in 1:d 
+        v *= ker(x[i]/h[i])
+    end
+    v
+end
+
+function ker(x::Matrix, xi::Vector, h::Vector)
+    n, p = size(x)
+    v = zeros(n)
+    for i in 1:n
+        v[i] = ker(x[i, :] - xi, h)
+    end
+    v
+end
+
+ρ(x, α = alpha) = abs(x) + (2α - 1)x
+
+function optimfunc(f, init_value, tols = 1e-4)
+    res = optimize(f, init_value, method=BFGS(), f_tol=tols)
+    return res 
+end
+
+module qglsim
+
+	function alphatheta_estimator(X, Z, y)
+
+		n, p = size(X)
+		h = ones(p) .* 0.1
+		categ, index = collection(Z)
+
+		for z in categ
+			nz = length(index[z])
+			for i in index[z]
+				ai = 0
+				bi = zeros(p)
+				tarfunc = sum(ρ.(y .- ai .- bi * (X .- X[i, :]) .* ker.((X .- x[i, :]), h)))
+				
+			end
+		
+		end
+
+	end
+
+	
+	function estimator_theta()
+	
+	end
+
+	function estimator_beta()
+	
+	end
+
+	function estimator_gamma()
+	
+	end
+end
