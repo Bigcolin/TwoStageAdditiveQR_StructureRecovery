@@ -1,41 +1,7 @@
 module additiveQR
+include("supportFuncs.ji")
 include("DGP.ji")
-using LinearAlgebra, Optim, Distributions
-import Base.Threads.@spawn, Base.Threads.@threads
 using BasicBSpline
-
-function bisec_search(f, r, l, tol = 1e-4)
-# this search is based on f has a global optimizer
-    delta = l - r
-    yi = 0
-    while delta > tol
-        b_ = LinRange(r, l, 3)
-        y_ = f.(b_)
-        ind = argmin(y_)
-        yi = b_[ind]
-        if ind == 1
-            r = b_[1]
-            l = b_[2]
-        end
-        
-        if ind == 3
-            r = b_[2]
-            l = b_[3]
-        end
-        
-        if ind == 2
-            if y_[1] < y_[3]
-                r = b_[1]
-                l = b_[2]
-            else
-                r = b_[2]
-                l = b_[3]
-            end
-        end
-        delta = l - r
-    end
-    yi
-end
 
 struct bsplElems
     pBasis::Int
@@ -50,19 +16,6 @@ struct bsplElems
         nBasis = length(knot) - pBasis - 1
         new(pBasis, nBasis, knot)
     end
-end
-
-# knots = [-2.0,-.5, -.25, 0, .25, .5, 2.0]
-# pbs = 2
-# nbs = 3  # n = 3, p = 2 is the best basis para. according to QBIC
-# elems0 = bsplElems(pbs, nbs)
-
-# ker(x, a = 3.5) = pdf(Truncated(Normal(0,1), -a, a), a*x)
-ker(x) = pdf(Normal(0, 1), x)
-
-function optimfunc(f, init_value, tols = 1e-3)
-    res = optimize(f, init_value, method=BFGS(), f_tol=tols)
-    return res
 end
 
 function assemblePx(X, p)
@@ -80,7 +33,6 @@ end
 struct twoStageAddQR
     basisElems::bsplElems
     pfuncs
-    ρ
     Mx::Array{Float64, 2}
     coef::Array{Float64, 1}
     qbic::Float64
@@ -88,13 +40,14 @@ struct twoStageAddQR
     intercept::Float64
     y_min::Float64
     y_max::Float64
-    function twoStageAddQR(splElems::bsplElems, trainData::data, alpha::Float64, u::Bool=false)
-        ρ(x, α = alpha) = abs(x) + (2α - 1)x
+    tau::Float64
+    function twoStageAddQR(splElems::bsplElems, trainData::data, tau::Float64, u::Bool=false)
+        ρ(x) = rho(x, tau)
         nBasis = splElems.nBasis
         pBasis = splElems.pBasis
-        knots = Knots(splElems.knot)
-        bsp = BSplineSpace(pBasis, knots)
-        pfuncs(x) = bsplinebasis(bsp, x)
+        knots = KnotVector(splElems.knot)
+        bsp = BSplineSpace{pBasis}(knots)
+        pfuncs(t) = [bsplinebasis(bsp,i,t) for i in 1:BasicBSpline.dim(bsp)]
         n, d = size(trainData.X)
         A, Ak = assemblePx(trainData.X, pfuncs)
         if u
@@ -123,7 +76,7 @@ struct twoStageAddQR
         end
         y_min = minimum(trainData.y) 
         y_max = maximum(trainData.y)
-        new(splElems, pfuncs, ρ, M, coef, qbic, trainData, intercept, y_min, y_max)
+        new(splElems, pfuncs, M, coef, qbic, trainData, intercept, y_min, y_max, tau)
     end
 
 end
@@ -137,30 +90,33 @@ end
 function predictor(model::twoStageAddQR, xi::Float64, λi::Float64, i::Int, ∇ = 2)
     # println("Predicting vector xn via model on stage 2... \n")
     X = model.trainData.X
-    n,d = size(X)
+    y = model.trainData.y
+    tau = model.tau
+    ρ(x) = rho(x, tau)
+    n, = size(X)
     msum = sum(model.Mx, dims=2)
     u = model.intercept
     yi = 0
     h = 1/λi
-    
+    Xi = xi .- X[:, i] 
+    Wi = ker(Xi, h)
     if ∇ == 2
         b0 = zeros(2)
-        f_d2(b::Array{Float64, 1}) = sum(model.ρ.((model.trainData.y .- u .- b[1] .- b[2].*(X[:,i] .- xi)./h)
-                                .- (msum .- model.Mx[:,i])) .* ker.((xi .- X[:,i])./h))./(n*h)
+        f_d2(b::Array{Float64, 1}) = sum(ρ.((y .- u .- b[1] .- b[2].*Wi)
+                                        .- (msum .- model.Mx[:,i])) .* Wi)./(n*h)
         res = optimfunc(f_d2, b0)
         yi = res.minimizer[1]
     
     elseif ∇ == 1
-        f_d1(b) = sum(model.ρ.((model.trainData.y .- u .- b)
-                                .- (msum .- model.Mx[:,i])) .* ker.((xi .- X[:,i])./h))./(n*h)
+        f_d1(b) = sum(ρ.((y .- u .- b) .- (msum .- model.Mx[:,i])) .* Wi)./(n*h)
         r = model.y_min
         l = model.y_max
         yi = bisec_search(f_d1, r, l)
 
     elseif ∇ == 3
         b0 = zeros(3)    
-        f_d3(b::Array{Float64, 1}) = sum(model.ρ.((model.trainData.y .- u .- b[1] .- b[2].*(X[:,i] .- xi)./h .- b[3].*((X[:,i] .- xi)./h).^2)
-                                .- (msum .- model.Mx[:,i])) .* ker.((xi .- X[:,i])./h))./(n*h)
+        f_d3(b::Array{Float64, 1}) = sum(ρ.((y .- u .- b[1] .- b[2].*Wi .- b[3].*(Wi).^2)
+                                        .- (msum .- model.Mx[:,i])) .* Wi)./(n*h)
         res = optimfunc(f_d3, b0)
         yi = res.minimizer[1]
     end
@@ -222,12 +178,9 @@ function predictor(model::twoStageAddQR, Xt::Array{Float64, 2}, λ::Array{Float6
     
 end
 
+SAE(model::twoStageAddQR, λ::Array{Float64, 1}, ∇) = sum(rho.(model.trainData.y - predictor(model, model.trainData.X, λ, ∇), model.tau))
 
-
-
-SAE(model::twoStageAddQR, λ::Array{Float64, 1}, ∇) = sum(model.ρ.(model.trainData.y - predictor(model, model.trainData.X, λ, ∇)))
-
-SAE(model::twoStageAddQR, λ::Array{Float64, 1}, X::Array{Float64, 2}, y::Array{Float64, 1}, ∇) = sum(model.ρ.(y - predictor(model, X, λ, ∇)))
+SAE(model::twoStageAddQR, λ::Array{Float64, 1}, X::Array{Float64, 2}, y::Array{Float64, 1}, ∇) = sum(rho.(y - predictor(model, X, λ, ∇), model.tau))
 
 end # end module
 # @Threads.threads 
