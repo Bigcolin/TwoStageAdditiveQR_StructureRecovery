@@ -3,16 +3,19 @@ include("../src/StructClassifier.ji")
 var = 1
 eta = 0.
 q = 0.5
-nSamples = 100
+nTrain = 180
+nTest = 20
 dSamples = 3
 d_zeros = 1
 err_type = "g"
 f = open("record.txt", "w")
 close(f)
-@threads for k in 1:10
-	trainData = additiveQR.data(nSamples, dSamples, d_zeros, var, eta, err_type)
-	model1 = model(trainData, 0.5)
-	res1 = strucRec(model1, 2, 12.0, 20)
+@threads for k in 1:4
+	trainData = additiveQR.data(nTrain, dSamples, d_zeros, var, eta, err_type)
+	testData = additiveQR.data(nTest, dSamples, d_zeros, var, eta, err_type)
+	
+	model1 = generate_model(trainData, q)
+	res1 = strucRec(model1, testData, 2, 12.0, 64)
     f = open("record.txt", "a")
 	println(f, res1, "\n")
     close(f)

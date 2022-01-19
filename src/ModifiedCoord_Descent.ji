@@ -1,7 +1,6 @@
 # an optimize band width selection via SAE
 # λi = 1/hi, i = 1:d  
 # tau = sum(λ)
-
 module Modified_CoorDescent
 using LinearAlgebra
 using Base.Threads
@@ -39,7 +38,7 @@ function search(SAE_tarfunc, λ0::Vector{Float64}, n_iter = 32,  tol = 0.5)
             
 
             tarfunc(γ) = SAE_tarfunc(γ * λd + (τ - γ) * lambda_d)
-            res = optimize(tarfunc, 0.0, τ, iterations = 200)
+            res = optimize(tarfunc, 0.0, τ, iterations = 120)
 
             γ = res.minimizer
             λ_γ = γ * λd + (τ - γ) * lambda_d

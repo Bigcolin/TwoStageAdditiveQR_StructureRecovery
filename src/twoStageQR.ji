@@ -30,7 +30,7 @@ function assemblePx(X, p)
     return A , Ak
 end
 
-struct twoStageAddQR
+struct model
     basisElems::bsplElems
     pfuncs
     Mx::Array{Float64, 2}
@@ -41,7 +41,7 @@ struct twoStageAddQR
     y_min::Float64
     y_max::Float64
     tau::Float64
-    function twoStageAddQR(splElems::bsplElems, trainData::data, tau::Float64, u::Bool=false)
+    function model(splElems::bsplElems, trainData::data, tau::Float64, u::Bool=false)
         ρ(x) = rho(x, tau)
         nBasis = splElems.nBasis
         pBasis = splElems.pBasis
@@ -81,21 +81,21 @@ struct twoStageAddQR
 
 end
 
-function predictor(model::twoStageAddQR, Xt::Array{Float64, 2})
-    # println("Predicting via model on stage 1... \n")
-    A, = assemblePx(Xt, model.pfuncs)
-    A*model.coef .+ model.intercept
+function predictor(model1::model, Xt::Array{Float64, 2})
+    # println("Predicting via model1 on stage 1... \n")
+    A, = assemblePx(Xt, model1.pfuncs)
+    A*model1.coef .+ model1.intercept
 end
 
-function predictor(model::twoStageAddQR, xi::Float64, λi::Float64, i::Int, ∇ = 2)
-    # println("Predicting vector xn via model on stage 2... \n")
-    X = model.trainData.X
-    y = model.trainData.y
-    tau = model.tau
+function predictor(model1::model, xi::Float64, λi::Float64, i::Int, ∇ = 2)
+    # println("Predicting vector xn via model1 on stage 2... \n")
+    X = model1.trainData.X
+    y = model1.trainData.y
+    tau = model1.tau
     ρ(x) = rho(x, tau)
     n, = size(X)
-    msum = sum(model.Mx, dims=2)
-    u = model.intercept
+    msum = sum(model1.Mx, dims=2)
+    u = model1.intercept
     yi = 0
     h = 1/λi
     Xi = xi .- X[:, i] 
@@ -103,20 +103,20 @@ function predictor(model::twoStageAddQR, xi::Float64, λi::Float64, i::Int, ∇ 
     if ∇ == 2
         b0 = zeros(2)
         f_d2(b::Array{Float64, 1}) = sum(ρ.((y .- u .- b[1] .- b[2].*Wi)
-                                        .- (msum .- model.Mx[:,i])) .* Wi)./(n*h)
+                                        .- (msum .- model1.Mx[:,i])) .* Wi)./(n*h)
         res = optimfunc(f_d2, b0)
         yi = res.minimizer[1]
     
     elseif ∇ == 1
-        f_d1(b) = sum(ρ.((y .- u .- b) .- (msum .- model.Mx[:,i])) .* Wi)./(n*h)
-        r = model.y_min
-        l = model.y_max
+        f_d1(b) = sum(ρ.((y .- u .- b) .- (msum .- model1.Mx[:,i])) .* Wi)./(n*h)
+        r = model1.y_min
+        l = model1.y_max
         yi = bisec_search(f_d1, r, l)
 
     elseif ∇ == 3
         b0 = zeros(3)    
         f_d3(b::Array{Float64, 1}) = sum(ρ.((y .- u .- b[1] .- b[2].*Wi .- b[3].*(Wi).^2)
-                                        .- (msum .- model.Mx[:,i])) .* Wi)./(n*h)
+                                        .- (msum .- model1.Mx[:,i])) .* Wi)./(n*h)
         res = optimfunc(f_d3, b0)
         yi = res.minimizer[1]
     end
@@ -125,51 +125,51 @@ end
 
 ####
 # Parallel on d
-function predictor(model::twoStageAddQR, Xi::Array{Float64, 1}, λi::Float64, i::Int, ∇)
-    # println("Predicting vector xn via model on stage 2... \n")
-    X = model.trainData.X
+function predictor(model1::model, Xi::Array{Float64, 1}, λi::Float64, i::Int, ∇)
+    # println("Predicting vector xn via model1 on stage 2... \n")
+    X = model1.trainData.X
     n = length(Xi)
     yi = zeros(n)
     for k in 1:n
         xi = Xi[k]
-        yi[k] = predictor(model, xi, λi, i, ∇)
+        yi[k] = predictor(model1, xi, λi, i, ∇)
     end
     yi
 end
 
 # Parallel on n
-function predictor(model::twoStageAddQR, Xn::Array{Float64, 1}, λ::Array{Float64, 1}, ∇)
-    # println("Predicting vector xn via model on stage 2... \n")
-    # X = model.trainData.X
+function predictor(model1::model, Xn::Array{Float64, 1}, λ::Array{Float64, 1}, ∇)
+    # println("Predicting vector xn via model1 on stage 2... \n")
+    # X = model1.trainData.X
     d = length(Xn)
     yn = 0
     for k in 1:d
         xk = Xn[k]
-        yn += predictor(model, xk, λ[k], k, ∇)
+        yn += predictor(model1, xk, λ[k], k, ∇)
     end
     yn
 end
 
-function predictor(model::twoStageAddQR, Xt::Array{Float64, 2}, λ::Array{Float64, 1}, ∇ = 2) # 之前是对d并行，最多只有d个线程，这里改成对n并F行
-    # println("Predicting matrix Xt via model on stage 2... \n")
+function predictor(model1::model, Xt::Array{Float64, 2}, λ::Array{Float64, 1}, ∇ = 2) # 之前是对d并行，最多只有d个线程，这里改成对n并F行
+    # println("Predicting matrix Xt via model1 on stage 2... \n")
     n, d = size(Xt)
-    u = model.intercept
+    u = model1.intercept
     y = ones(n).*u
     parallel = 0
     if parallel == 'n'
         @threads for i in 1:n
-            y[i] = predictor(model, Xt[i, :], λ, ∇)
+            y[i] = predictor(model1, Xt[i, :], λ, ∇)
         end
 
     elseif parallel == 'd'
         @threads for i in 1:d
-            yi = predictor(model, Xt[:, i], λ[i], i, ∇)
+            yi = predictor(model1, Xt[:, i], λ[i], i, ∇)
             y += yi
         end
 
     else
         for i in 1:n
-            y[i] = predictor(model, Xt[i, :], λ, ∇)
+            y[i] = predictor(model1, Xt[i, :], λ, ∇)
         end
     end
 
@@ -178,9 +178,9 @@ function predictor(model::twoStageAddQR, Xt::Array{Float64, 2}, λ::Array{Float6
     
 end
 
-SAE(model::twoStageAddQR, λ::Array{Float64, 1}, ∇) = sum(rho.(model.trainData.y - predictor(model, model.trainData.X, λ, ∇), model.tau))
+# SAE(model1::model, λ::Array{Float64, 1}, ∇) = sum(rho.(model1.trainData.y - predictor(model1, model1.trainData.X, λ, ∇), model1.tau))
 
-SAE(model::twoStageAddQR, λ::Array{Float64, 1}, X::Array{Float64, 2}, y::Array{Float64, 1}, ∇) = sum(rho.(y - predictor(model, X, λ, ∇), model.tau))
+SAE(model1::model, testData, λ::Array{Float64, 1}, ∇) = sum(rho.(testData.y - predictor(model1, testData.X, λ, ∇), model1.tau))
 
 end # end module
 # @Threads.threads 

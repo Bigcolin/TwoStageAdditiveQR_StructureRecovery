@@ -2,9 +2,9 @@ include("twoStageQR.ji")
 using MAT
 using Base.Threads
 
-function model(trainData, q = 0.5, pbs = 3, nbs = 4)
+function generate_model(trainData, q = 0.5, pbs = 3, nbs = 4)
 	knots = [-4., -3., -2., 0., 2., 3., 4.]./2 # ./2 .+ 0.5
 	elems = additiveQR.bsplElems(pbs, nbs)
 	# elems = additiveQR.bsplElems(knots, pbs)
-	model = additiveQR.twoStageAddQR(elems, trainData, q, true)
+	model1 = additiveQR.model(elems, trainData, q, true)
 end

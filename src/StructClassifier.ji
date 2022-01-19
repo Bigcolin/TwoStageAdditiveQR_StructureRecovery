@@ -1,8 +1,7 @@
 using Base.Threads
 include("ModifiedCoord_Descent.ji")
-include("analysis.ji")
-function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
-    n, Dim = size(model.trainData.X)
+function strucRec(model, testData, ∇ = 1, tau = 0, n_mcd = 64)
+    n, p = size(model.trainData.X)
     if tau == 0
         nstep = 12
         Tau = (1:nstep)  .* 4
@@ -11,30 +10,21 @@ function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
         Tau = [0.6, 0.8, 1.0, 1.2] .*tau
     end
 
-    Lambda = ones(nstep, Dim) .* Tau ./Dim
-    sae(l) = additiveQR.SAE(model, l, ∇)
+    Lambda = ones(nstep, p) .* Tau ./p
+    sae(l) = additiveQR.SAE(model, testData, l, ∇)
     
     @threads for k in 1:nstep
         Lambda[k, :] = Modified_CoorDescent.MCD_optim(model, sae, Lambda[k, :], ∇, n_mcd)
     end
 
     BIC_lambda = zeros(nstep)
-    Index = zeros(nstep, Dim)
-    Index = Bool.(Index)    
+
     for k in 1:nstep
-        Index[k, :], BIC_lambda[k] = qBIC(Lambda[k, :], model, ∇)
-        if sum(Index[k, :]) == 0
-            BIC_lambda[k] = 1e7
-        end
+        BIC_lambda[k] = n*sae(Lambda[k, :]) + 2p * log(n)
     end
     lk = argmin(BIC_lambda)
-
-    ind = Index[lk, :]
     lambda = Lambda[lk, :]
-    
-    max_l = maximum(lambda)
-    indm = lambda .> max_l/(20) * ∇ 
-    ind = ind .* indm
+
     
     # filename = string("results_$∇", ".mat")
     # matwrite(filename, Dict("lambda" => lambda, "index" => ind))
@@ -42,6 +32,5 @@ function strucRec(model, ∇ = 1, tau = 0, n_mcd = 64)
     res = Dict( 
                 "path" => Lambda,
                 "lambda" => lambda,
-                "index" => ind,
     )
 end

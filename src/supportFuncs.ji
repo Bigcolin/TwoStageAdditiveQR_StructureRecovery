@@ -2,6 +2,18 @@ using LinearAlgebra, Optim, Distributions
 using QuantReg, GLM, DataFrames
 import Base.Threads.@spawn, Base.Threads.@threads
 
+function QBIC(pbs, nSamples)
+    minkn = pbs + 1
+    println("Sample size is $nSamples \n")
+    trainData = additiveQR.data_set3d(nSamples)
+    for kn in minkn:minkn + 3
+        elem = additiveQR.bsplElems(pbs, kn)
+        model1 = additiveQR.model(elem, trainData, 0.5)
+        println("QBIC(nBasis = $kn, pBasis = $pbs) is $(model1.qbic) \n")
+    end
+end
+
+
 function bisec_search(f, r, l, tol = 1e-4)
     # this search is based on f has a global optimizer
         delta = l - r
