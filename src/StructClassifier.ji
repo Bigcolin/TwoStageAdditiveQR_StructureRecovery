@@ -6,8 +6,8 @@ function strucRec(model, testData, ∇ = 1, tau = 0, n_mcd = 64)
         nstep = 12
         Tau = (1:nstep)  .* 4
     else
-        nstep = 4
-        Tau = [0.6, 0.8, 1.0, 1.2] .*tau
+        nstep = 3
+        Tau = [0.8, 1.0, 1.2] .*tau
     end
 
     Lambda = ones(nstep, p) .* Tau ./p
@@ -17,12 +17,12 @@ function strucRec(model, testData, ∇ = 1, tau = 0, n_mcd = 64)
         Lambda[k, :] = Modified_CoorDescent.MCD_optim(model, sae, Lambda[k, :], ∇, n_mcd)
     end
 
-    BIC_lambda = zeros(nstep)
+    sae_lambda = zeros(nstep)
 
     for k in 1:nstep
-        BIC_lambda[k] = n*sae(Lambda[k, :]) + 2p * log(n)
+        sae_lambda[k] = sae(Lambda[k, :])
     end
-    lk = argmin(BIC_lambda)
+    lk = argmin(sae_lambda)
     lambda = Lambda[lk, :]
 
     
