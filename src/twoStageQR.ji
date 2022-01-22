@@ -98,7 +98,7 @@ function predictor(model1::model, xi::Float64, λi::Float64, i::Int, ∇ = 2)
     u = model1.intercept
     yi = 0
     h = 1/λi
-    Xi = X[:, i] .- xi 
+    Xi = X[:, i] .- xi
     Wi = ker(Xi, h)
     if ∇ == 2
         b0 = zeros(2)
@@ -109,7 +109,8 @@ function predictor(model1::model, xi::Float64, λi::Float64, i::Int, ∇ = 2)
     
     elseif ∇ == 1
         f_d1(b::Float64) = sum(ρ.((y .- u .- b) .- (msum .- model1.Mx[:,i])) .* Wi)
-        dy = model1.y_max - model1.y_min
+        dy = (model1.y_max - model1.y_min)/10
+        # yi = bisec_search(f_d1, model1.y_min - dy, model1.y_max + dy)
         res = Optim.optimize(f_d1, model1.y_min - dy, model1.y_max + dy)
         yi = res.minimizer
 
@@ -150,10 +151,11 @@ function predictor(model1::model, Xn::Array{Float64, 1}, λ::Array{Float64, 1}, 
     yn
 end
 
-function predictor(model1::model, Xt::Array{Float64, 2}, λ::Array{Float64, 1}, ∇ = 2) # 之前是对d并行，最多只有d个线程，这里改成对n并F行
+function predictor(model1::model, Xt::Array{Float64, 2}, λ::Array{Float64, 1}, ∇ = 2, sepy = false) # 之前是对d并行，最多只有d个线程，这里改成对n并F行
     # println("Predicting matrix Xt via model1 on stage 2... \n")
     n, d = size(Xt)
     u = model1.intercept
+    sep_y = zeros(n, d)
     y = ones(n).*u
     parallel = 0
     if parallel == 'n'
@@ -164,6 +166,7 @@ function predictor(model1::model, Xt::Array{Float64, 2}, λ::Array{Float64, 1}, 
     elseif parallel == 'd'
         @threads for i in 1:d
             yi = predictor(model1, Xt[:, i], λ[i], i, ∇)
+            sep_y[:, i] = yi
             y += yi
         end
 
@@ -173,9 +176,11 @@ function predictor(model1::model, Xt::Array{Float64, 2}, λ::Array{Float64, 1}, 
         end
     end
 
-
-    y
-    
+    if sepy
+        return sep_y
+    else
+        return y
+    end
 end
 
 # SAE(model1::model, λ::Array{Float64, 1}, ∇) = sum(rho.(model1.trainData.y - predictor(model1, model1.trainData.X, λ, ∇), model1.tau))

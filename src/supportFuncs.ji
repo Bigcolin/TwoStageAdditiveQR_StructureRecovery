@@ -107,7 +107,7 @@ function rho_eps(r, a, e)
 end
     
 
-function optimfunc(f, init_value, tols = 1e-3)
+function optimfunc(f, init_value, tols = 1e-4)
     res = optimize(f, init_value, method=BFGS(), f_tol=tols)
     return res
 end

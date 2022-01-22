@@ -1,7 +1,7 @@
 include("../src/twoStageQR.ji")
 include("../src/StructClassifier.ji")
 
-function generate_model(trainData, q = 0.5, pbs = 3, nbs = 4)
+function generate_model(trainData, q = 0.5, pbs = 2, nbs = 4)
 	knots = [-4., -3., -2., 0., 2., 3., 4.]./2 # ./2 .+ 0.5
 	elems = additiveQR.bsplElems(pbs, nbs)
 	# elems = additiveQR.bsplElems(knots, pbs)
@@ -10,36 +10,44 @@ end
 
 function main(orderPoly = 3)
 	
-	var = 1
+	var = 0.2
 	eta = 0.
 	q = 0.5
-	nTrain = 180
-	nTest = 20
+	nTrain = 225
+	nTest = 25
 	dSamples = 3
-	d_zeros = 1
+	d_zeros = 7
 	err_type = "g"
 	trainData1 = additiveQR.data(nTrain, dSamples, d_zeros, var, eta, err_type)
 	testData1 = additiveQR.data(nTest, dSamples, d_zeros, var, eta, err_type)	
+
 	# f = open("record.txt", "w")
 	# close(f)
 	# @threads for k in 1:4
 	Lambda = Dict()
+	ytr = trainData1.y
+	yte = testData1.y
 	ind = Int.(ones(dSamples + d_zeros))
 	for k in 1:orderPoly
 		model1 = generate_model(trainData1, q)
-		res1 = strucRec(model1, testData1, k, 10.0, 32*k)
+		res1 = strucRec(model1, testData1, k, 10.0 ./ k , 120/(2k - 1))
 		lambda = res1["lambda"]
+		println(lambda)
 		# bic0 = nTest * log(additiveQR.SAE(model1, testData1, lambda, k)) + 2*length(lambda)*log(nTest)
 		# println("bic0: ", bic0)
 		# bic1 = copy(bic0) 
 		# while bic1 <= bic0 && length(lambda) > 1
-			Xtr, ytr = trainData1.X, trainData1.y
-			Xte, yte = testData1.X, testData1.y
+			Xtr = trainData1.X
+			Xte = testData1.X
 			# bic0 = copy(bic1)
 			p = length(lambda)
-			indl = lambda .> sum(lambda)/(4p)
+			indl = lambda .> maximum(lambda)/p
+			ind0 =  Bool.(1 .- indl)
 			lambda_ = lambda[indl]
-			println(lambda_)
+			if k > 1 && sum(ind0) > 0
+				yte = yte - additiveQR.predictor(model1, Xte[:, ind0], Lambda[k - 1][1][ind0], k - 1)
+				ytr = ytr - additiveQR.predictor(model1, Xtr[:, ind0], Lambda[k - 1][1][ind0], k - 1)
+			end
 			trainData2 = additiveQR.data(Xtr[:, indl], ytr)
 			testData2 = additiveQR.data(Xte[:, indl], yte)
 			# model2 = generate_model(trainData2, q)
@@ -55,9 +63,9 @@ function main(orderPoly = 3)
 		Lambda[k] = [lambda, ind]
 
 	end
-	#     f = open("record.txt", "a")
-	# 	println(f, res1, "\n")
-	#     close(f)
+	    f = open("record.txt", "w")
+		println(f, Lambda, "\n")
+	    close(f)
 	# end
 	Lambda
 	# sae(l) = additiveQR.SAE(model1, l, 1)
