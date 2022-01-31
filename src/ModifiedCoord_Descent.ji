@@ -19,16 +19,18 @@ function MCD_optim(model, sae, tau::Vector{Float64}, ∇, n_iter = 32)
     λ   
 end
 
-function search(SAE_tarfunc, λ0::Vector{Float64}, n_iter = 32,  tol = 0.5)
+function search(SAE_tarfunc, λ0::Vector{Float64}, n_iter = 32,  tol = 0.05)
     dim = length(λ0)    
     τ = sum(λ0)
 
     λ = copy(λ0)
     funcval = SAE_tarfunc(λ)
-    Δ = funcval .* ones(5)
+    Δ = 1.0
     n = 0
     tau = round(τ, digits = 2)
-    while (sum(Δ) > tol) & (n < n_iter)
+    # Lambda = []
+    # FunVal = []
+    while (Δ > tol) & (n < n_iter)
         for d in 1:dim
             λd = zeros(dim) 
             λd[d] = 1.0
@@ -36,17 +38,17 @@ function search(SAE_tarfunc, λ0::Vector{Float64}, n_iter = 32,  tol = 0.5)
             lambda_d[d] = 0
             lambda_d = lambda_d./sum(lambda_d)
             
-
             tarfunc(γ) = SAE_tarfunc(γ * λd + (τ - γ) * lambda_d)
-            res = optimize(tarfunc, 0.0, τ, iterations = 100)
+            res = optimize(tarfunc, 0.0, τ, iterations = 20)
 
             γ = res.minimizer
             λ_γ = γ * λd + (τ - γ) * lambda_d
             funcval_i = res.minimum
 
-            if funcval_i < sum(Δ)./5
-                pop!(Δ)
-                pushfirst!(Δ, funcval_i) # mean(Δ) < tol/10, iter stop
+            if funcval_i < funcval
+                # pop!(Δ)
+                # pushfirst!(Δ, funcval_i) # mean(Δ) < tol/10, iter stop
+                Δ = norm(λ - λ_γ)
                 funcval = funcval_i
                 λ = λ_γ
             end 
