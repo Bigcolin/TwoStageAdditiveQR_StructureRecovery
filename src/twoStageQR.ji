@@ -1,5 +1,6 @@
 module additiveQR
 include("supportFuncs.ji")
+include("localLinear_quantReg.ji")
 include("DGP.ji")
 using BasicBSpline
 
@@ -35,13 +36,13 @@ struct model
     pfuncs
     Mx::Array{Float64, 2}
     coef::Array{Float64, 1}
-    qbic::Float64
-    trainData::data
     intercept::Float64
+    # qbic::Float64
+    trainData::data
     y_min::Float64
     y_max::Float64
     tau::Float64
-    function model(splElems::bsplElems, trainData::data, tau::Float64, u::Bool=false)
+    function model(splElems::bsplElems, trainData::data, tau::Float64)
         ρ(x) = rho(x, tau)
         nBasis = splElems.nBasis
         pBasis = splElems.pBasis
@@ -50,25 +51,14 @@ struct model
         pfuncs(t) = [bsplinebasis(bsp,i,t) for i in 1:BasicBSpline.dim(bsp)]
         n, d = size(trainData.X)
         A, Ak = assemblePx(trainData.X, pfuncs)
-        if u
-            Intercept = ones(n, 1)
-            θ_0 = rand(d*nBasis + 1)
-            A = hcat(Intercept, A)
-            func(θ) = sum(ρ.(trainData.y - A*θ))./n
-            res = optimfunc(func, θ_0)
-            # QBIC: determined by basis parameters
-            qbic = n*log(n*res.minimum) + 2log(n)*nBasis
-            coef = res.minimizer[2:end]
-            intercept = res.minimizer[1]
-        else
-            θ_0 = rand(d*nBasis)
-            func_(θ) = sum(ρ.(trainData.y - A*θ))./n
-            res = optimfunc(func_, θ_0)
-            # QBIC: determined by basis parameters
-            qbic = n*log(n*res.minimum) + 2log(n)*nBasis
-            coef = res.minimizer   
-            intercept = 0      
-        end
+        θ_0 = rand(d*nBasis + 1)
+        # func(θ) = sum(ρ.(trainData.y - A*θ))./n
+        # res = optimfunc(func, θ_0)
+        res = localLinear_quantReg.qr_solver(trainData.y, A, tau, 0)
+        # QBIC: determined by basis parameters
+        # qbic = n*log(n*res.minimum) + 2log(n)*nBasis
+        coef = res[2:end]
+        intercept = res[1]
         M = zeros(n, d)
         coefm = reshape(coef, nBasis, d)
         for k in 1:d
@@ -76,7 +66,7 @@ struct model
         end
         y_min = minimum(trainData.y) 
         y_max = maximum(trainData.y)
-        new(splElems, pfuncs, M, coef, qbic, trainData, intercept, y_min, y_max, tau)
+        new(splElems, pfuncs, M, coef, intercept, trainData, y_min, y_max, tau)
     end
 
 end
@@ -100,25 +90,40 @@ function predictor(model1::model, xi::Float64, λi::Float64, i::Int, ∇ = 2)
     h = 1/λi
     Xi = X[:, i] .- xi
     Wi = ker(Xi, h)
+	y_ = y .- u .- (msum .- model1.Mx[:,i])
+
     if ∇ == 2
-        b0 = zeros(2)
-        f_d2(b::Array{Float64, 1}) = sum(ρ.((y .- u .- b[1] .- b[2].*Xi)
-                                        .- (msum .- model1.Mx[:,i])) .* Wi)
-        res = optimfunc(f_d2, b0)
-        yi = res.minimizer[1]
+        df = DataFrame([y_ ones(n) Xi].*Wi)
+        noy = :x1
+        nox = [:x2, :x3]
+        res = localLinear_quantReg.qr_solver(df, noy, nox, tau)
+        # println(res)
+        yi =  res[2] 
     
     elseif ∇ == 1
-        f_d1(b::Float64) = sum(ρ.((y .- u .- b) .- (msum .- model1.Mx[:,i])) .* Wi)
-        dy = (model1.y_max - model1.y_min)/10
-        res = Optim.optimize(f_d1, model1.y_min - dy, model1.y_max + dy)
-        yi = res.minimizer
+        df = DataFrame([y_ ones(n)].*Wi)
+        noy = :x1
+        nox = [:x2]
+        res = localLinear_quantReg.qr_solver(df, noy, nox, tau)
+        # println(res)
+        yi =  res[2] 
 
     elseif ∇ == 3
-        b0 = zeros(3)    
-        f_d3(b::Array{Float64, 1}) = sum(ρ.((y .- u .- b[1] .- b[2].*Xi .- b[3].*(Xi).^2)
-                                        .- (msum .- model1.Mx[:,i])) .* Wi)
-        res = optimfunc(f_d3, b0)
-        yi = res.minimizer[1]
+        df = DataFrame([y_ ones(n) Xi  Xi.^2].*Wi)
+        noy = :x1
+        nox = [:x2, :x3, :x4]
+        res = localLinear_quantReg.qr_solver(df, noy, nox, tau)
+        # println(res)
+        yi =  res[2] 
+
+    elseif ∇ == 4
+        df = DataFrame([y_ ones(n) Xi  Xi.^2 Xi.^3].*Wi)
+        noy = :x1
+        nox = [:x2, :x3, :x4, :x5]
+        res = localLinear_quantReg.qr_solver(df, noy, nox, tau)
+        # println(res)
+        yi =  res[2] 
+
     end
     yi
 end
@@ -156,24 +161,11 @@ function predictor(model1::model, Xt::Array{Float64, 2}, λ::Array{Float64, 1}, 
     u = model1.intercept
     sep_y = zeros(n, d)
     y = ones(n).*u
-    parallel = 0
-    if parallel == 'n'
-        @threads for i in 1:n
-            y[i] = predictor(model1, Xt[i, :], λ, ∇)
-        end
 
-    elseif parallel == 'd'
-        @threads for i in 1:d
-            yi = predictor(model1, Xt[:, i], λ[i], i, ∇)
-            sep_y[:, i] = yi
-            y += yi
-        end
-
-    else
-        for i in 1:n
-            y[i] = predictor(model1, Xt[i, :], λ, ∇)
-        end
+    for i in 1:n
+        y[i] += predictor(model1, Xt[i, :], λ, ∇)
     end
+
 
     if sepy
         return sep_y

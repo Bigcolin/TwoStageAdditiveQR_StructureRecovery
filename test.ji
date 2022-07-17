@@ -1,0 +1,16 @@
+include("./src/twoStageQR.ji")
+
+var = 0.2
+eta = 0.
+q = 0.5
+nTrain = 225
+nTest = 25
+dSamples = 3
+d_zeros = 7
+err_type = "g"
+trainData = additiveQR.data(nTrain, dSamples, d_zeros, var, eta, err_type)
+testData = additiveQR.data(nTest, dSamples, d_zeros, var, eta, err_type)	
+knots = [-4, -3, -2, 0, 2, 3, 4.0]/2
+pbs, nbs = 2, 4
+elems = additiveQR.bsplElems(pbs, nbs)
+model = additiveQR.model(elems, trainData, q)
